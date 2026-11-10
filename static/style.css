@@ -113,11 +113,11 @@ button:focus-visible { outline: 3px solid #8dbadd; outline-offset: 2px; }
 
 .circuit { display: block; width: 100%; height: auto; }
 
-.wire { stroke: #33475b; stroke-width: 2.2; stroke-linecap: round; fill: none; }
-.resistor { stroke: #33475b; stroke-width: 2; fill: none; }
+.wire, .base-bar, .gnd { stroke: #33475b; stroke-width: 2.2; stroke-linecap: round; fill: none; }
+.base-bar { stroke-width: 4; }
+.res { fill: #eef4fa; stroke: #33475b; stroke-width: 2; }
 .device { fill: #eaf2fa; stroke: #33475b; stroke-width: 2; }
 .arrow { fill: #33475b; }
-.ground { stroke: #33475b; stroke-width: 2; fill: none; }
 
 .part-label { font: 600 13px "Segoe UI", Tahoma, sans-serif; fill: #17344b; }
 .part-value { font: 13px Consolas, Menlo, monospace; fill: #546d83; }
