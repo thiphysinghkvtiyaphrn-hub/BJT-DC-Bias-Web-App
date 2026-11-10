@@ -9,12 +9,11 @@ Common-Emitter แบบ **Voltage-Divider Bias**
 | ภาคการศึกษา | 2/2569 |
 | Lab | 02 — First DC Bias Web App |
 | เจ้าของ repo | [@thiphysinghkvtiyaphrn-hub](https://github.com/thiphysinghkvtiyaphrn-hub) |
-| สถานะ | 🚧 Scaffolding — รอ Design Approval ก่อน implement |
+| สถานะ | ✅ Implemented — 13 automated tests ผ่านทั้งหมด |
 
-> **สถานะปัจจุบัน:** repo นี้ยังไม่มีโค้ดแอปพลิเคชัน
-> มีเพียงโครงสร้าง โปรเจกต์ เอกสาร และการตั้งค่า Python Environment
-> โค้ดจะถูกเพิ่มหลังผ่านขั้น Brainstorming → Design Approval → Plan Review
-> ตาม workflow ของ Superpowers
+> **สถานะปัจจุบัน:** แอปพลิเคชันทำงานครบตามขอบเขต Lab 02
+> (ฟอร์ม → Python คำนวณ → แสดงผล + region warning)
+> ผ่านการทดสอบ 13 tests และตรวจสอบกับ[การคำนวณด้วยมือ](docs/validation.md)แล้ว
 
 ---
 
@@ -113,6 +112,10 @@ python -m flask --app app run --debug
 ```powershell
 python -m unittest discover -s tests -v
 ```
+
+ผลที่คาดหวัง: `Ran 13 tests ... OK` (engineering math 7 tests + Flask HTTP 6 tests)
+
+รายละเอียดการตรวจสอบค่ากับการคำนวณด้วยมืออยู่ใน [`docs/validation.md`](docs/validation.md)
 
 ---
 
