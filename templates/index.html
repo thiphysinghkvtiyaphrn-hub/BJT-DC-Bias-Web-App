@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lab 02 · BJT DC Bias Web App</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div>
+        <p class="eyebrow">ENG29 2121 · Computer Programming for Electrical Engineers</p>
+        <h1>Lab 02 · BJT DC Bias Web App</h1>
+        <p class="subtitle">Common Emitter — Voltage Divider Bias, forward-active approximation</p>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    {% if errors %}
+      <div class="banner banner-error" role="alert">
+        <strong>Check your input</strong>
+        <ul>
+          {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <div class="grid">
+      <section class="panel">
+        <h2>Input Parameters</h2>
+        <form method="post" action="{{ url_for('calculate') }}">
+          <table class="inputs">
+            <tbody>
+            {% for field, label, unit in fields %}
+              <tr>
+                <th scope="row"><label for="{{ field }}">{{ label }}</label></th>
+                <td><input id="{{ field }}" name="{{ field }}" type="text" inputmode="decimal"
+                           value="{{ form[field] }}" autocomplete="off"></td>
+                <td class="unit">{{ unit }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+          <button type="submit">Calculate DC Bias</button>
+        </form>
+        <p class="hint">Resistances are entered in kΩ. Values are converted to Ω before solving.</p>
+      </section>
+
+      <section class="panel">
+        <h2>Circuit</h2>
+        <svg class="circuit" viewBox="0 0 360 420" role="img"
+             aria-label="NPN common-emitter amplifier with voltage divider bias">
+          <g class="wire">
+            <line x1="180" y1="40" x2="180" y2="78"/>
+            <line x1="60" y1="40" x2="300" y2="40"/>
+            <line x1="180" y1="40" x2="180" y2="40"/>
+          </g>
+          <text class="node-label" x="186" y="30">VCC = {{ form.vcc }} V</text>
+
+          <!-- R1 : VCC to base node -->
+          <line class="wire" x1="80" y1="40" x2="80" y2="96"/>
+          <rect class="res" x="68" y="96" width="24" height="58" rx="3"/>
+          <line class="wire" x1="80" y1="154" x2="80" y2="210"/>
+          <text class="part-label" x="18" y="120">R1</text>
+          <text class="part-value" x="18" y="138">{{ form.r1 }} kΩ</text>
+
+          <!-- R2 : base node to ground -->
+          <line class="wire" x1="80" y1="210" x2="80" y2="266"/>
+          <rect class="res" x="68" y="266" width="24" height="58" rx="3"/>
+          <line class="wire" x1="80" y1="324" x2="80" y2="372"/>
+          <text class="part-label" x="18" y="290">R2</text>
+          <text class="part-value" x="18" y="308">{{ form.r2 }} kΩ</text>
+
+          <!-- base rail -->
+          <line class="wire" x1="80" y1="210" x2="150" y2="210"/>
+
+          <!-- RC : VCC to collector -->
+          <line class="wire" x1="272" y1="40" x2="272" y2="96"/>
+          <rect class="res" x="260" y="96" width="24" height="58" rx="3"/>
+          <line class="wire" x1="272" y1="154" x2="272" y2="196"/>
+          <text class="part-label" x="292" y="120">RC</text>
+          <text class="part-value" x="292" y="138">{{ form.rc }} kΩ</text>
+
+          <!-- transistor -->
+          <line class="wire" x1="272" y1="196" x2="212" y2="196"/>
+          <line class="wire" x1="150" y1="210" x2="176" y2="210"/>
+          <line class="base-bar" x1="176" y1="182" x2="176" y2="238"/>
+          <line class="wire" x1="176" y1="196" x2="212" y2="180"/>
+          <line class="wire" x1="176" y1="224" x2="212" y2="240"/>
+          <circle class="device" cx="204" cy="210" r="42"/>
+          <polygon class="arrow" points="212,240 196,236 204,226"/>
+          <text class="part-label" x="250" y="252">Q1</text>
+          <text class="part-value" x="250" y="270">NPN β = {{ form.beta }}</text>
+
+          <!-- RE : emitter to ground -->
+          <line class="wire" x1="212" y1="240" x2="212" y2="266"/>
+          <rect class="res" x="200" y="266" width="24" height="58" rx="3"/>
+          <line class="wire" x1="212" y1="324" x2="212" y2="372"/>
+          <text class="part-label" x="236" y="290">RE</text>
+          <text class="part-value" x="236" y="308">{{ form.re }} kΩ</text>
+
+          <!-- grounds -->
+          <line class="gnd" x1="62" y1="372" x2="98" y2="372"/>
+          <line class="gnd" x1="70" y1="380" x2="90" y2="380"/>
+          <line class="gnd" x1="194" y1="372" x2="230" y2="372"/>
+          <line class="gnd" x1="202" y1="380" x2="222" y2="380"/>
+        </svg>
+        <p class="hint">Labels show the values you entered. Computed node voltages are in the results panel.</p>
+      </section>
+
+      <section class="panel">
+        <h2>DC Bias Results</h2>
+        <table class="results">
+          <tbody>
+          {% set rows = [
+               ('VB', 'vb'), ('VE', 've'), ('VC', 'vc'), ('VCE', 'vce'),
+               ('IB', 'ib'), ('IC', 'ic'), ('IE', 'ie')
+             ] %}
+          {% for label, key in rows %}
+            <tr>
+              <th scope="row">{{ label }}</th>
+              <td class="value">
+                {%- if display and result and result.region == 'active' -%}
+                  {{ display[key] }}
+                {%- else -%}
+                  —
+                {%- endif -%}
+              </td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+        <p class="hint">Forward-active approximation: constant β and constant VBE.</p>
+      </section>
+    </div>
+
+    {% if result %}
+      <div class="banner banner-{{ result.region }}">
+        <strong>{{ region_label }}</strong>
+        {% if result.region == 'active' %}
+          <span>Operating point is inside the forward-active region (VCE &gt; 0.2 V).</span>
+        {% else %}
+          {% for warning in result.warnings %}<span>{{ warning }}</span>{% endfor %}
+        {% endif %}
+      </div>
+
+      <details class="details">
+        <summary>Calculation details</summary>
+        <table class="intermediate">
+          <tbody>
+            <tr>
+              <th scope="row">VTH = VCC × R2 / (R1 + R2)</th>
+              <td>{{ display.vth }}</td>
+            </tr>
+            <tr>
+              <th scope="row">RTH = R1 × R2 / (R1 + R2)</th>
+              <td>{{ display.rth }}</td>
+            </tr>
+          </tbody>
+        </table>
+        {% if result.region != 'active' %}
+          <p class="hint">
+            Only the bias network quantities are reported. Operating-point values are
+            not reported outside the forward-active region, because the equations above
+            do not describe the device there.
+          </p>
+        {% endif %}
+      </details>
+    {% endif %}
+  </main>
+
+  <footer>ENG29 2121 · Lab 02 · Flask + Python backend</footer>
+</body>
+</html>
