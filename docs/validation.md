@@ -3,10 +3,12 @@
 เอกสารนี้ตรวจสอบว่าเว็บคำนวณตรงกับ **การคำนวณด้วยมือ** (independent hand
 calculation) ไม่ใช่แค่เอาค่าที่โค้ดให้มาใส่ซ้ำ
 
+- ขอบเขต: Lab 02 Voltage Divider Bias + Lab 03 Fixed Bias และ Emitter Bias
 - สมการอ้างอิง: `docs/superpowers/specs/2026-11-10-bjt-dc-bias-design.md` §7.4
-- โค้ดที่ตรวจ: `dc_bias.py::compute_dc_bias`
-- หน้าจอที่ตรวจ: `POST /calculate` (เทมเพลต `templates/index.html`)
-- ตรวจเมื่อ: 2026-11-10
+  และ `docs/superpowers/specs/2026-11-17-bjt-three-bias-modes-design.md` §7.1
+- โค้ดที่ตรวจ: `dc_bias.py` (`compute_dc_bias`, `compute_fixed_bias`, `compute_emitter_bias`)
+- หน้าจอที่ตรวจ: `GET /?mode=...` และ `POST /calculate` (เทมเพลต `templates/index.html`)
+- ตรวจเมื่อ: 2026-11-10 (Lab 02), 2026-11-17 (Lab 03)
 
 ## 1. ชุดค่าอ้างอิง
 
@@ -125,7 +127,7 @@ VCE = 8.052 V > 0.2 V          → ไม่อิ่มตัว
 | กรณี | อินพุต | ผลที่คาด | ผลจริง |
 |---|---|---|---|
 | Cutoff | `R2 = 1 kΩ` → VTH = 0.119 V | region `cutoff`, ตาราง `—` ทุกช่อง, ไม่มีตัวเลข VCE | ✅ ผ่าน (`test_cutoff_region`, `test_cutoff_page_hides_values`) |
-| Saturation | `RE = 0.1 kΩ`, `RC = 10 kΩ` → VCE ≈ −45.3 V (< 0.2 V) | region `saturation`, warning | ✅ ผ่าน (`test_saturation_region`) |
+| Saturation | `RE = 0.1 kΩ`, `RC = 10 kΩ` → IB = 52.04 µA, IC = 5.2037 mA, VC = −40.037 V, VE = 0.526 V → VCE = −40.562 V (< 0.2 V) | region `saturation`, warning | ✅ ผ่าน (`test_saturation_region`) |
 | ตัวต้านทานเป็นศูนย์ | `R1 = 0` | HTTP 400 + "R1 must be greater than zero." | ✅ ผ่าน (`test_zero_resistance_returns_400`) |
 | ค่าที่ไม่ใช่ตัวเลข | `VCC = "abc"` | HTTP 400 + ฟอร์มคงค่าเดิม | ✅ ผ่าน (`test_non_numeric_value_returns_400`, `test_form_keeps_submitted_values_on_error`) |
 
@@ -134,3 +136,136 @@ VCE = 8.052 V > 0.2 V          → ไม่อิ่มตัว
 - เป็น forward-active approximation (β คงที่, VBE คงที่) ไม่ใช่ผล SPICE
 - threshold 0.2 V เป็นค่าที่เลือกใช้ ไม่ใช่ค่าที่รายวิชากำหนด
 - ไม่ได้ทดสอบกับ ngspice เพราะอยู่นอกขอบเขต Lab 02
+
+---
+
+# Lab 03 — Fixed Bias และ Emitter Bias
+
+## 7. วิธีตรวจและเครื่องมือ
+
+| รายการ | ค่า |
+|---|---|
+| เว็บที่รัน | Flask 3.1 dev server, `http://127.0.0.1:5000` |
+| วิธีตรวจหลัก | **OpenCode Browser** (Chromium ในแอป) — เปิดแท็บ, กรอกฟอร์มจริง, กด Calculate DC Bias |
+| Playwright MCP | **NOT RUN** — เครื่องนี้ไม่มี `node`/`npx` (`node --version` → CommandNotFoundException) จึงเริ่ม MCP server ตามใบงานไม่ได้ ใบงานอนุญาตให้ใช้วิธีอื่นได้ |
+| Automated tests | `unittest discover` → 29 tests ผ่านทั้งหมด (Divider 13 + Fixed/Emitter/validation 16) |
+| เกณฑ์คลาดเคลื่อน | IC ±0.01 mA, VCE ±0.02 V เทียบกับค่ามือที่ยังไม่ปัด |
+
+ค่ามือทั้งหมดใน §8–§10 คำนวณและบันทึกไว้ **ก่อน** เปิดเบราว์เซอร์รัน
+เพื่อไม่ให้เป็นการคัดลอกค่าจากหน้าเว็บ
+
+## 8. ผลตรวจ A1–A5
+
+ทุกกรณีใช้ `VCC = 12 V`, `RC = 2.2 kΩ`, `β = 100`, `VBE = 0.70 V`
+(อินพุตที่เหลือตามคอลัมน์ "อินพุตเพิ่มเติม"; ฟอร์มใช้ kΩ ทั้งหมด)
+
+| # | โหมด | อินพุตเพิ่มเติม | ค่ามือ IC (mA) | ค่ามือ VCE (V) | เว็บแสดง IC | เว็บแสดง VCE | ผล | หลักฐาน |
+|---|---|---|---|---|---|---|---|---|
+| A1 | Divider | R1 = 100, R2 = 22, RE = 1 | 1.229858 | 8.052155 | 1.230 mA | 8.052 V | ✅ | [A1](evidence/lab03-A1.jpeg) + ตาราง §3 |
+| A2 | Fixed | RB = 1000 (= 1 MΩ) | 1.130000 | 9.514000 | 1.130 mA | 9.514 V | ✅ | [A2](evidence/lab03-A2.jpeg) |
+| A3 | Emitter | RB = 1000, RE = 1 | 1.026340 | 8.705450 | 1.026 mA | 8.705 V | ✅ | [A3](evidence/lab03-A3.jpeg) |
+| A4 | Emitter | RB = 1000, RE = 2 | 0.940100 | 8.032779 | 0.940 mA | 8.033 V | ✅ | [A4](evidence/lab03-A4.jpeg) |
+| A5 | Fixed | RB = 0 | error (ไม่คำนวณ) | error | — (ทุกช่อง `—`) | — | ✅ | [A5](evidence/lab03-A5.jpeg) |
+
+**A1 ต้องเหมือน Lab 02 ทุกค่า** — เทียบกับ baseline ที่บันทึกก่อนแก้โค้ด:
+
+| ปริมาณ | Lab 02 (ก่อนแก้) | Lab 03 (หลังเพิ่มโหมด) |
+|---|---|---|
+| VB | 1.942 V | 1.942 V |
+| VE | 1.242 V | 1.242 V |
+| VC | 9.294 V | 9.294 V |
+| VCE | 8.052 V | 8.052 V |
+| IB | 12.30 µA | 12.30 µA |
+| IC | 1.230 mA | 1.230 mA |
+| IE | 1.242 mA | 1.242 mA |
+
+### ผลจริงจากเบราว์เซอร์ (ครบทุกแถว)
+
+| # | VB | VE | VC | VCE | IB | IC | IE | Region |
+|---|---|---|---|---|---|---|---|---|
+| A1 | 1.942 V | 1.242 V | 9.294 V | 8.052 V | 12.30 µA | 1.230 mA | 1.242 mA | Active |
+| A2 | 0.700 V | 0.000 V | 9.514 V | 9.514 V | 11.30 µA | 1.130 mA | 1.141 mA | Active |
+| A3 | 1.737 V | 1.037 V | 9.742 V | 8.705 V | 10.26 µA | 1.026 mA | 1.037 mA | Active |
+| A4 | 2.599 V | 1.899 V | 9.932 V | 8.033 V | 9.40 µA | 0.940 mA | 949.50 µA | Active |
+| A5 | — | — | — | — | — | — | — | error banner |
+
+> A5: HTTP 400 พร้อมข้อความ `RB must be greater than zero.`
+> และแบนเนอร์ระบุโหมดที่เลือก (`Check your input — Fixed Bias`)
+> ผลของรอบก่อนไม่ค้างอยู่ — ทั้ง 7 ช่องเป็น `—` (ตรวจแล้วว่าไม่มีช่องใดมีตัวเลข)
+
+## 9. ค่าอ้างอิงอิสระทีละขั้น
+
+### A2 — Fixed Bias (RB = 1 MΩ)
+
+```
+RB = 1 MΩ = 1 000 000 Ω
+IB = (VCC − VBE) / RB
+   = (12 − 0.70) / 1 000 000
+   = 11.3 / 1 000 000 = 1.1300 × 10⁻⁵ A = 11.30 µA
+IC = β · IB = 100 × 11.30 µA = 1.1300 mA
+IE = (β+1) · IB = 101 × 11.30 µA = 1.1413 mA
+VE = 0 V                          (อีมิเตอร์ต่อลงกราวด์)
+VB = VE + VBE = 0 + 0.70 = 0.700 V
+VC = VCC − IC · RC = 12 − 1.1300 mA × 2.2 kΩ
+   = 12 − 2.486 = 9.514 V
+VCE = VC − VE = 9.514 V
+```
+
+### A3 — Emitter Bias (RB = 1 MΩ, RE = 1 kΩ)
+
+```
+IB = (VCC − VBE) / [RB + (β+1)·RE]
+   = 11.3 / (1 000 000 + 101 × 1 000)
+   = 11.3 / 1 101 000
+   = 1.0263397 × 10⁻⁵ A = 10.2634 µA
+IC = 100 × 10.2634 µA = 1.026340 mA
+IE = 101 × 10.2634 µA = 1.036603 mA
+VE = IE · RE = 1.036603 mA × 1 kΩ = 1.036603 V
+VB = 1.036603 + 0.70 = 1.736603 V
+VC = 12 − 1.026340 mA × 2.2 kΩ = 12 − 2.257947 = 9.742053 V
+VCE = 9.742053 − 1.036603 = 8.705450 V
+```
+
+### A4 — Emitter Bias (RB = 1 MΩ, RE = 2 kΩ)
+
+```
+IB = 11.3 / (1 000 000 + 101 × 2 000)
+   = 11.3 / 1 202 000
+   = 9.40100 × 10⁻⁶ A = 9.4010 µA
+IC = 100 × 9.4010 µA = 0.940100 mA
+IE = 101 × 9.4010 µA = 0.9495008 mA
+VE = 0.9495008 mA × 2 kΩ = 1.899002 V
+VB = 1.899002 + 0.70 = 2.599002 V
+VC = 12 − 0.940100 mA × 2.2 kΩ = 12 − 2.068220 = 9.931780 V
+VCE = 9.931780 − 1.899002 = 8.032779 V
+```
+
+### ทิศทางของ A3 → A4
+
+`RE` เพิ่มจาก 1 kΩ เป็น 2 kΩ ทำให้ตัวส่วน `RB + (β+1)·RE` ใหญ่ขึ้น
+→ `IB` ลดลง → `IC` ลดลง (1.026 → 0.940 mA)
+ขณะเดียวกัน `VE = IE·RE` เพิ่มขึ้นมาก (1.037 → 1.899 V) จนมากกว่าที่ `VC` เพิ่มขึ้น
+(9.742 → 9.932 V) ดังนั้น **VCE ลดลง** (8.705 → 8.033 V)
+ซึ่งตรงกับที่เบราว์เซอร์แสดงทั้งสองทิศทาง
+
+## 10. ข้อสังเกตและข้อจำกัดของ Lab 03
+
+- `IE` ของ A4 แสดงเป็น `949.50 µA` เพราะกฎการแสดงผลเดิมคือ "ต่ำกว่า 1 mA ใช้ µA"
+  ส่วน `IC` แสดงเป็น mA เสมอตามที่ใบงานกำหนด (0.940 mA) — ทั้งคู่มาจาก `IB` เดียวกัน
+  โดย `IC = β·IB` และ `IE = (β+1)·IB` ดังนั้น `IE` มากกว่า `IC` เล็กน้อยตามธรรมชาติ
+- Fixed Bias ไม่มี `RE` ในฟอร์ม และ `VE = 0.000 V` โดยนิยาม
+- Emitter Bias ใช้ `RB` จาก VCC ไปเบส และ `RE` จากอีมิเตอร์ลงกราวด์ (แหล่งจ่ายเดียว)
+- ยังเป็น forward-active approximation (β คงที่, VBE คงที่) ไม่ใช่ผล SPICE
+- ไม่มีการทดสอบ AC, transient, Bode หรือ DC load line เพราะอยู่นอกขอบเขต Lab 03
+
+## 11. ไฟล์หลักฐาน
+
+ภาพหน้าจอจากการรันจริงใน OpenCode Browser (เก็บไว้ในรีโป):
+
+| ไฟล์ | เนื้อหา |
+|---|---|
+| `docs/evidence/lab03-A1.jpeg` | Divider — ได้ค่าเดิมของ Lab 02 |
+| `docs/evidence/lab03-A2.jpeg` | Fixed Bias RB = 1000 kΩ |
+| `docs/evidence/lab03-A3.jpeg` | Emitter Bias RB = 1000 kΩ, RE = 1 kΩ |
+| `docs/evidence/lab03-A4.jpeg` | Emitter Bias RE = 2 kΩ — IC ลด, VCE ลด |
+| `docs/evidence/lab03-A5.jpeg` | Fixed Bias RB = 0 — error, ไม่มีผลค้าง |
