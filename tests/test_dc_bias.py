@@ -1,6 +1,6 @@
 import unittest
 
-from dc_bias import compute_dc_bias
+from dc_bias import compute_dc_bias, compute_emitter_bias, compute_fixed_bias
 
 REFERENCE = dict(
     vcc_v=12.0,
@@ -63,6 +63,75 @@ class TestRegionDetection(unittest.TestCase):
         self.assertEqual(r.region, "saturation")
         self.assertLess(r.vce_v, 0.2)
         self.assertTrue(r.warnings)
+
+
+class TestFixedBias(unittest.TestCase):
+    def test_reference_values(self):
+        r = compute_fixed_bias(
+            vcc_v=12.0, rb_ohm=1_000_000.0, rc_ohm=2_200.0,
+            beta=100.0, vbe_v=0.70,
+        )
+        self.assertEqual(r["mode"], "fixed")
+        self.assertAlmostEqual(r.ib_a, 1.13e-05, places=9)
+        self.assertAlmostEqual(r.ic_a, 1.13e-03, places=9)
+        self.assertAlmostEqual(r.ie_a, 1.1413e-03, places=9)
+        self.assertAlmostEqual(r.ve_v, 0.0, places=12)
+        self.assertAlmostEqual(r.vb_v, 0.70, places=9)
+        self.assertAlmostEqual(r.vc_v, 9.514, places=9)
+        self.assertAlmostEqual(r.vce_v, 9.514, places=9)
+        self.assertEqual(r.region, "active")
+
+    def test_dict_contract(self):
+        r = compute_fixed_bias(vcc_v=12.0, rb_ohm=1e6, rc_ohm=2200.0,
+                               beta=100.0, vbe_v=0.7)
+        for key in ("mode", "ib_a", "ic_a", "ie_a", "ic_ma", "vb_v",
+                    "ve_v", "vc_v", "vce_v", "region", "warnings"):
+            self.assertIn(key, r)
+        self.assertAlmostEqual(r["ic_ma"], r["ic_a"] * 1000.0, places=12)
+
+
+class TestEmitterBias(unittest.TestCase):
+    def test_reference_values(self):
+        r = compute_emitter_bias(
+            vcc_v=12.0, rb_ohm=1_000_000.0, re_ohm=1_000.0,
+            rc_ohm=2_200.0, beta=100.0, vbe_v=0.70,
+        )
+        self.assertEqual(r["mode"], "emitter")
+        self.assertAlmostEqual(r.ib_a, 1.026339691e-05, places=9)
+        self.assertAlmostEqual(r.ic_a, 1.026339691e-03, places=9)
+        self.assertAlmostEqual(r.ie_a, 1.036603088e-03, places=9)
+        self.assertAlmostEqual(r.ve_v, 1.036603088, places=6)
+        self.assertAlmostEqual(r.vb_v, 1.736603088, places=6)
+        self.assertAlmostEqual(r.vc_v, 9.742052680, places=6)
+        self.assertAlmostEqual(r.vce_v, 8.705449592, places=6)
+
+    def test_re_higher_lowers_ic_and_vce(self):
+        low = compute_emitter_bias(vcc_v=12.0, rb_ohm=1e6, re_ohm=1000.0,
+                                   rc_ohm=2200.0, beta=100.0, vbe_v=0.7)
+        high = compute_emitter_bias(vcc_v=12.0, rb_ohm=1e6, re_ohm=2000.0,
+                                    rc_ohm=2200.0, beta=100.0, vbe_v=0.7)
+        self.assertLess(high.ic_a, low.ic_a)
+        self.assertLess(high.vce_v, low.vce_v)
+        self.assertAlmostEqual(high.ic_a, 9.400998336e-04, places=9)
+        self.assertAlmostEqual(high.vce_v, 8.032778702, places=6)
+
+
+class TestNewModeValidation(unittest.TestCase):
+    def test_zero_rb_raises(self):
+        with self.assertRaises(ValueError):
+            compute_fixed_bias(vcc_v=12.0, rb_ohm=0.0, rc_ohm=2200.0,
+                               beta=100.0, vbe_v=0.7)
+        with self.assertRaises(ValueError):
+            compute_emitter_bias(vcc_v=12.0, rb_ohm=0.0, re_ohm=1000.0,
+                                 rc_ohm=2200.0, beta=100.0, vbe_v=0.7)
+
+    def test_non_finite_raises(self):
+        with self.assertRaises(ValueError):
+            compute_fixed_bias(vcc_v=float("inf"), rb_ohm=1e6, rc_ohm=2200.0,
+                               beta=100.0, vbe_v=0.7)
+        with self.assertRaises(ValueError):
+            compute_emitter_bias(vcc_v=12.0, rb_ohm=float("nan"), re_ohm=1000.0,
+                                 rc_ohm=2200.0, beta=100.0, vbe_v=0.7)
 
 
 if __name__ == "__main__":
