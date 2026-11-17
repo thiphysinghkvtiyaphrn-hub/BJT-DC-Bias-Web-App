@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Lab 02 · BJT DC Bias Web App</title>
+  <title>Lab 03 · BJT DC Bias Web App</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -11,8 +11,8 @@
     <div class="masthead-inner">
       <div>
         <p class="eyebrow">ENG29 2121 · Computer Programming for Electrical Engineers</p>
-        <h1>Lab 02 · BJT DC Bias Web App</h1>
-        <p class="subtitle">Common Emitter — Voltage Divider Bias, forward-active approximation</p>
+        <h1>Lab 03 · BJT DC Bias Web App</h1>
+        <p class="subtitle">Common Emitter — Voltage Divider, Fixed and Emitter Bias, forward-active approximation</p>
       </div>
     </div>
   </header>
@@ -20,7 +20,7 @@
   <main>
     {% if errors %}
       <div class="banner banner-error" role="alert">
-        <strong>Check your input</strong>
+        <strong>{{ banner_title }}</strong>
         <ul>
           {% for error in errors %}<li>{{ error }}</li>{% endfor %}
         </ul>
@@ -30,7 +30,15 @@
     <div class="grid">
       <section class="panel">
         <h2>Input Parameters</h2>
+        {% set tab_labels = {'divider': 'Divider', 'fixed': 'Fixed', 'emitter': 'Emitter'} %}
+        <nav class="mode-tabs" aria-label="Bias mode">
+          {% for mode_id, mode_name in modes.items() %}
+            <a class="mode-tab" href="{{ url_for('index', mode=mode_id) }}"
+               {% if mode_id == mode %}aria-current="page"{% endif %}>{{ tab_labels[mode_id] }}</a>
+          {% endfor %}
+        </nav>
         <form method="post" action="{{ url_for('calculate') }}">
+          <input type="hidden" name="mode" value="{{ mode }}">
           <table class="inputs">
             <tbody>
             {% for field, label, unit in fields %}
@@ -45,17 +53,19 @@
           </table>
           <button type="submit">Calculate DC Bias</button>
         </form>
-        <p class="hint">Resistances are entered in kΩ. Values are converted to Ω before solving.</p>
+        <p class="hint">
+          Resistances are entered in kΩ. Values are converted to Ω before solving.
+          {% if mode != 'divider' %}RB = 1 MΩ → enter 1000 (kΩ).{% endif %}
+        </p>
       </section>
 
       <section class="panel">
         <h2>Circuit</h2>
+        {% if mode == 'divider' %}
         <svg class="circuit" viewBox="0 0 360 420" role="img"
              aria-label="NPN common-emitter amplifier with voltage divider bias">
           <g class="wire">
-            <line x1="180" y1="40" x2="180" y2="78"/>
             <line x1="60" y1="40" x2="300" y2="40"/>
-            <line x1="180" y1="40" x2="180" y2="40"/>
           </g>
           <text class="node-label" x="186" y="30">VCC = {{ form.vcc }} V</text>
 
@@ -107,11 +117,103 @@
           <line class="gnd" x1="194" y1="372" x2="230" y2="372"/>
           <line class="gnd" x1="202" y1="380" x2="222" y2="380"/>
         </svg>
+        {% elif mode == 'fixed' %}
+        <svg class="circuit" viewBox="0 0 360 420" role="img"
+             aria-label="NPN common-emitter amplifier with fixed bias">
+          <g class="wire">
+            <line x1="60" y1="40" x2="300" y2="40"/>
+          </g>
+          <text class="node-label" x="186" y="30">VCC = {{ form.vcc }} V</text>
+
+          <!-- RB : VCC to base node -->
+          <line class="wire" x1="80" y1="40" x2="80" y2="96"/>
+          <rect class="res" x="68" y="96" width="24" height="58" rx="3"/>
+          <line class="wire" x1="80" y1="154" x2="80" y2="210"/>
+          <text class="part-label" x="104" y="120">RB</text>
+          <text class="part-value" x="104" y="138">{{ form.rb }} kΩ</text>
+
+          <!-- base rail -->
+          <line class="wire" x1="80" y1="210" x2="150" y2="210"/>
+
+          <!-- RC : VCC to collector -->
+          <line class="wire" x1="272" y1="40" x2="272" y2="96"/>
+          <rect class="res" x="260" y="96" width="24" height="58" rx="3"/>
+          <line class="wire" x1="272" y1="154" x2="272" y2="196"/>
+          <text class="part-label" x="292" y="120">RC</text>
+          <text class="part-value" x="292" y="138">{{ form.rc }} kΩ</text>
+
+          <!-- transistor -->
+          <line class="wire" x1="272" y1="196" x2="212" y2="196"/>
+          <line class="wire" x1="150" y1="210" x2="176" y2="210"/>
+          <line class="base-bar" x1="176" y1="182" x2="176" y2="238"/>
+          <line class="wire" x1="176" y1="196" x2="212" y2="180"/>
+          <line class="wire" x1="176" y1="224" x2="212" y2="240"/>
+          <circle class="device" cx="204" cy="210" r="42"/>
+          <polygon class="arrow" points="212,240 196,236 204,226"/>
+          <text class="part-label" x="250" y="252">Q1</text>
+          <text class="part-value" x="250" y="270">NPN β = {{ form.beta }}</text>
+
+          <!-- emitter tied directly to ground (VE = 0) -->
+          <line class="wire" x1="212" y1="240" x2="212" y2="372"/>
+
+          <!-- ground -->
+          <line class="gnd" x1="194" y1="372" x2="230" y2="372"/>
+          <line class="gnd" x1="202" y1="380" x2="222" y2="380"/>
+        </svg>
+        {% else %}
+        <svg class="circuit" viewBox="0 0 360 420" role="img"
+             aria-label="NPN common-emitter amplifier with emitter bias">
+          <g class="wire">
+            <line x1="60" y1="40" x2="300" y2="40"/>
+          </g>
+          <text class="node-label" x="186" y="30">VCC = {{ form.vcc }} V</text>
+
+          <!-- RB : VCC to base node -->
+          <line class="wire" x1="80" y1="40" x2="80" y2="96"/>
+          <rect class="res" x="68" y="96" width="24" height="58" rx="3"/>
+          <line class="wire" x1="80" y1="154" x2="80" y2="210"/>
+          <text class="part-label" x="104" y="120">RB</text>
+          <text class="part-value" x="104" y="138">{{ form.rb }} kΩ</text>
+
+          <!-- base rail -->
+          <line class="wire" x1="80" y1="210" x2="150" y2="210"/>
+
+          <!-- RC : VCC to collector -->
+          <line class="wire" x1="272" y1="40" x2="272" y2="96"/>
+          <rect class="res" x="260" y="96" width="24" height="58" rx="3"/>
+          <line class="wire" x1="272" y1="154" x2="272" y2="196"/>
+          <text class="part-label" x="292" y="120">RC</text>
+          <text class="part-value" x="292" y="138">{{ form.rc }} kΩ</text>
+
+          <!-- transistor -->
+          <line class="wire" x1="272" y1="196" x2="212" y2="196"/>
+          <line class="wire" x1="150" y1="210" x2="176" y2="210"/>
+          <line class="base-bar" x1="176" y1="182" x2="176" y2="238"/>
+          <line class="wire" x1="176" y1="196" x2="212" y2="180"/>
+          <line class="wire" x1="176" y1="224" x2="212" y2="240"/>
+          <circle class="device" cx="204" cy="210" r="42"/>
+          <polygon class="arrow" points="212,240 196,236 204,226"/>
+          <text class="part-label" x="250" y="252">Q1</text>
+          <text class="part-value" x="250" y="270">NPN β = {{ form.beta }}</text>
+
+          <!-- RE : emitter to ground -->
+          <line class="wire" x1="212" y1="240" x2="212" y2="266"/>
+          <rect class="res" x="200" y="266" width="24" height="58" rx="3"/>
+          <line class="wire" x1="212" y1="324" x2="212" y2="372"/>
+          <text class="part-label" x="236" y="290">RE</text>
+          <text class="part-value" x="236" y="308">{{ form.re }} kΩ</text>
+
+          <!-- ground -->
+          <line class="gnd" x1="194" y1="372" x2="230" y2="372"/>
+          <line class="gnd" x1="202" y1="380" x2="222" y2="380"/>
+        </svg>
+        {% endif %}
         <p class="hint">Labels show the values you entered. Computed node voltages are in the results panel.</p>
       </section>
 
       <section class="panel">
         <h2>DC Bias Results</h2>
+        <p class="mode-label">{{ mode_label }}</p>
         <table class="results">
           <tbody>
           {% set rows = [
@@ -148,6 +250,7 @@
 
       <details class="details">
         <summary>Calculation details</summary>
+        {% if mode == 'divider' %}
         <table class="intermediate">
           <tbody>
             <tr>
@@ -160,6 +263,41 @@
             </tr>
           </tbody>
         </table>
+        {% elif mode == 'fixed' %}
+        <table class="intermediate">
+          <tbody>
+            <tr>
+              <th scope="row">VE = 0 V by definition (emitter grounded)</th>
+              <td>{{ display.ve }}</td>
+            </tr>
+            <tr>
+              <th scope="row">IB = (VCC − VBE) / RB</th>
+              <td>{% if result.region == 'active' %}{{ display.ib }}{% else %}—{% endif %}</td>
+            </tr>
+            <tr>
+              <th scope="row">IC = β × IB</th>
+              <td>{% if result.region == 'active' %}{{ display.ic }}{% else %}—{% endif %}</td>
+            </tr>
+          </tbody>
+        </table>
+        {% else %}
+        <table class="intermediate">
+          <tbody>
+            <tr>
+              <th scope="row">IB = (VCC − VBE) / [RB + (β + 1) RE]</th>
+              <td>{% if result.region == 'active' %}{{ display.ib }}{% else %}—{% endif %}</td>
+            </tr>
+            <tr>
+              <th scope="row">VE = IE × RE</th>
+              <td>{% if result.region == 'active' %}{{ display.ve }}{% else %}—{% endif %}</td>
+            </tr>
+            <tr>
+              <th scope="row">IC = β × IB</th>
+              <td>{% if result.region == 'active' %}{{ display.ic }}{% else %}—{% endif %}</td>
+            </tr>
+          </tbody>
+        </table>
+        {% endif %}
         {% if result.region != 'active' %}
           <p class="hint">
             Only the bias network quantities are reported. Operating-point values are
@@ -171,6 +309,6 @@
     {% endif %}
   </main>
 
-  <footer>ENG29 2121 · Lab 02 · Flask + Python backend</footer>
+  <footer>ENG29 2121 · Lab 03 · Flask + Python backend</footer>
 </body>
 </html>
