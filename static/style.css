@@ -65,6 +65,43 @@ main { max-width: 1280px; margin: 0 auto; padding: 20px 24px 56px; }
   letter-spacing: 0.02em;
 }
 
+.mode-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 14px;
+}
+
+.mode-tab {
+  flex: 1 1 auto;
+  padding: 7px 10px;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--blue);
+  background: #eef4fa;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  text-decoration: none;
+}
+
+.mode-tab:hover { background: #e2edf7; }
+
+.mode-tab[aria-current="page"] {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.mode-tab:focus-visible { outline: 3px solid #8dbadd; outline-offset: 2px; }
+
+.mode-label {
+  margin: -6px 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--teal);
+}
+
 table { width: 100%; border-collapse: collapse; }
 
 .inputs th {
