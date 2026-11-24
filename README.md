@@ -8,20 +8,22 @@ Common-Emitter ในโหมดไบอัสสามแบบ: **Voltage Di
 |---|---|
 | รายวิชา | ENG29 2121 Computer Programming for Electrical Engineers |
 | ภาคการศึกษา | 2/2569 |
-| Lab | 02 — First DC Bias Web App → 03 — Three Bias Modes |
+| Lab | 02 — First DC Bias Web App → 03 — Three Bias Modes → 04 — CE Amplifier Simulator (ngspice) |
 | เจ้าของ repo | [@thiphysinghkvtiyaphrn-hub](https://github.com/thiphysinghkvtiyaphrn-hub) |
-| สถานะ | ✅ Implemented — 29 automated tests ผ่านทั้งหมด |
+| สถานะ | ✅ Implemented — 68 automated tests ผ่านทั้งหมด |
 
-> **สถานะปัจจุบัน:** แอปพลิเคชันทำงานครบตามขอบเขต Lab 03
-> (เลือกโหมดผ่านแท็บ → Python คำนวณตามโหมด → แสดงผล + region warning)
-> ผ่านการทดสอบ 29 tests และตรวจสอบกับ[การคำนวณด้วยมือ](docs/validation.md)แล้ว
+> **สถานะปัจจุบัน:** แอปพลิเคชันทำงานครบตามขอบเขต Lab 04
+> (Lab 03: เลือกโหมดผ่านแท็บ → Python คำนวณตามโหมด → แสดงผล + region warning;
+> Lab 04: เลือกวิธีวิเคราะห์ผ่าน `/simulator` → ngspice รันจริง DC/AC/Transient →
+> แสดงผล + วาดกราฟ SVG + เปรียบเทียบกับแบบจำลอง Lab 3)
+> ผ่านการทดสอบ 68 tests และตรวจสอบกับ[การคำนวณด้วยมือ](docs/validation.md)แล้ว
 > โดยผลของ Voltage Divider ยังคงเหมือน Lab 02 ทุกค่า
 
 ---
 
 ## ขอบเขต (Scope)
 
-**อยู่ในขอบเขต Lab 2–3**
+**อยู่ในขอบเขต Lab 2–4**
 
 - เลือกโหมดได้ 3 แบบผ่านแท็บ `Divider | Fixed | Emitter` (ไม่ใช้ JavaScript)
 - ฟอร์มแสดงเฉพาะช่องที่โหมดนั้นใช้
@@ -35,9 +37,8 @@ Common-Emitter ในโหมดไบอัสสามแบบ: **Voltage Di
 
 **นอกขอบเขต (จะทำในสัปดาห์ถัดไป)**
 
-- SPICE / ngspice, DC Load Line (W4)
-- AC small-signal, Gain, Bode Plot (W5)
-- Transient, Signal Generator (W6)
+- DC Load Line (W4)
+- Signal Generator (W6)
 - Interactive schematic, DC/AC overlay (W7)
 - FET (W9–10)
 
@@ -113,9 +114,17 @@ python -m flask --app app run --debug
 - <http://127.0.0.1:5000/?mode=fixed> — Fixed Bias
 - <http://127.0.0.1:5000/?mode=emitter> — Emitter Bias
 
+### Lab 04 — CE Amplifier Simulator (ngspice)
+
+- <http://127.0.0.1:5000/simulator> — Common-Emitter voltage-divider amplifier simulator
+  (`?analysis=dc` | `?analysis=ac` | `?analysis=tran`, ผ่าน <form> POST ไป <action=/simulate>)
+
+> ngspice ต้องพร้อมใช้งาน: แอปมองหา `tools/ngspice/ucrt64/bin/ngspice_con.exe` ในโปรเจกต์
+> หรือใช้ env var `NGSPICE_BIN` ชี้ไปยัง executable
+
 > ⚠️ ต้องเปิดผ่าน Local Web Server เท่านั้น
-> **ห้าม** double-click เปิด `templates/index.html` ด้วย `file://`
-> เพราะฟอร์มต้องส่ง HTTP Request ไปให้ Python คำนวณ
+> **ห้าม** double-click เปิด `templates/index.html` ด้วย `file://` ได้ เพราะฟอร์มและ
+> ngspice ต้องผ่าน HTTP ของ Python
 
 ---
 
@@ -125,8 +134,8 @@ python -m flask --app app run --debug
 python -m unittest discover -s tests -v
 ```
 
-ผลที่คาดหวัง: `Ran 29 tests ... OK`
-(engineering math 13 tests + Flask HTTP 16 tests)
+ผลที่คาดหวัง: `Ran 71 tests ... OK`
+(engineering math 13 tests + Flask HTTP 16 tests + ngspice adapter 25 tests + plots 3 tests + /simulate routes 23 tests)
 
 รายละเอียดการตรวจสอบค่ากับการคำนวณด้วยมืออยู่ใน [`docs/validation.md`](docs/validation.md)
 
