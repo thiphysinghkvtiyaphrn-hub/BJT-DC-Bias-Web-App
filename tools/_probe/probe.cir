@@ -1,0 +1,24 @@
+* probe: CE voltage divider, batch with .control
+VCC vcc 0 DC 12
+VIN in 0 DC 0 AC 1 SIN(0 10m 1k)
+R1 vcc base 100k
+R2 base 0 22k
+RC vcc coll 2.2k
+RE emit 0 1k
+CIN in base 10u
+COUT coll out 10u
+RL out 0 10k
+Q1 coll base emit Q2N3904
+.model Q2N3904 NPN (IS=6.734f XTI=3 EG=1.11 VAF=74.03 BF=416.4 NE=1.259 ISE=6.734f IKF=66.78m XTB=1.5 BR=.7371 NC=2 ISC=0 IKR=0 RC=1 CJC=3.638p MJC=.3085 VJC=.75 FC=.5 CJE=4.493p MJE=.2593 VJE=.75 TR=239.5n TF=301.2p ITF=.4 VTF=4 XTF=2 RB=10)
+
+.control
+set wr_singlescale
+set wr_vecnames
+op
+print v(base) v(emit) v(coll) v(coll)-v(emit) @q1[ic] @q1[ib]
+ac dec 20 10 10meg
+wrdata ac.txt vdb(out) vp(out)
+tran 2u 5m
+wrdata tran.txt v(in) v(out)
+quit
+.endc
