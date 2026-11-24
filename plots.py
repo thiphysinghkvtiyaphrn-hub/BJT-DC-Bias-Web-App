@@ -51,14 +51,14 @@ def _nice_ticks(low: float, high: float, count: int = 5) -> list[float]:
     return ticks
 
 
-def _decade_ticks(low: float, high: float) -> list[float]:
+def _decade_ticks(low: float, high: float, stride: int = 1) -> list[float]:
     ticks = []
     exponent = math.floor(math.log10(low))
     while 10 ** exponent <= high * 1.0001:
         value = 10 ** exponent
         if value >= low * 0.9999:
             ticks.append(value)
-        exponent += 1
+        exponent += stride
     return ticks
 
 
@@ -97,7 +97,7 @@ class _Panel:
             f'stroke-linecap="round"{extra}/>'
         )
 
-    def y_grid(self, ticks, unit="", label_fmt=None):
+    def y_grid(self, ticks, unit="", label_fmt=None, font=13):
         parts = []
         for tick in ticks:
             yy = self.py(tick)
@@ -108,11 +108,11 @@ class _Panel:
             text = label_fmt(tick) if label_fmt else _eng(tick, unit)
             parts.append(
                 f'<text x="{self.x - 8:.1f}" y="{yy + 4:.1f}" text-anchor="end" '
-                f'font-size="13" fill="{MUTED}">{text}</text>'
+                f'font-size="{font}" fill="{MUTED}">{text}</text>'
             )
         return "".join(parts)
 
-    def x_grid(self, ticks, label_fmt, labels=True):
+    def x_grid(self, ticks, label_fmt, labels=True, font=13):
         parts = []
         for tick in ticks:
             xx = self.px(tick)
@@ -123,7 +123,7 @@ class _Panel:
             if labels:
                 parts.append(
                     f'<text x="{xx:.1f}" y="{self.y + self.h + 17:.1f}" '
-                    f'text-anchor="middle" font-size="13" fill="{MUTED}">'
+                    f'text-anchor="middle" font-size="{font}" fill="{MUTED}">'
                     f"{label_fmt(tick)}</text>"
                 )
         return "".join(parts)
@@ -145,152 +145,194 @@ def _wrap(width, height, inner, title, desc):
     )
 
 
+def _wrap_responsive(width, height, wide_inner, narrow_inner, title, desc):
+    """Wrap two real renderings of the same data; CSS shows one per viewport."""
+    scale = width / 380
+    return (
+        f'<svg class="chart chart-responsive" viewBox="0 0 {width} {height}" '
+        f'role="img" aria-labelledby="{title} {desc}" xmlns="http://www.w3.org/2000/svg">'
+        f'<title id="{title}">{title}</title>'
+        f'<desc id="{desc}">{desc}</desc>'
+        f'<g class="chart-wide">{wide_inner}</g>'
+        f'<g class="chart-narrow" transform="scale({scale:.6f})">{narrow_inner}</g>'
+        f'</svg>'
+    )
+
+
 def bode_svg(freqs, gain_db, phase_deg, cutoff=None, width=760, height=470) -> str:
-    """Magnitude + phase versus log frequency, from one .ac run."""
+    """Magnitude + phase versus log frequency, from one .ac run.
+
+    The SVG holds two real renderings of the same arrays: a wide one for
+    desktop and a compact one for narrow screens. CSS shows exactly one.
+    """
     if not freqs:
         return ""
 
-    left, right, top, gap, bottom = 66, 18, 22, 34, 44
-    plot_w = width - left - right
-    mag_h = 190
-    phase_h = 130
-    fmin, fmax = min(freqs), max(freqs)
+    def render(w, h, compact=False):
+        if compact:
+            left, right, top, gap, bottom = 46, 10, 16, 22, 32
+            mag_h, phase_h = 95, 70
+            font, small = 16, 15
+            stride = 3
+        else:
+            left, right, top, gap, bottom = 66, 18, 22, 34, 44
+            mag_h, phase_h = 190, 130
+            font, small = 13, 12
+            stride = 1
+        plot_w = w - left - right
+        fmin, fmax = min(freqs), max(freqs)
 
-    g_lo = math.floor(min(gain_db) / 5) * 5
-    g_hi = math.ceil(max(gain_db) / 5) * 5
-    if g_hi - g_lo < 5:
-        g_hi = g_lo + 5
+        g_lo = math.floor(min(gain_db) / 5) * 5
+        g_hi = math.ceil(max(gain_db) / 5) * 5
+        if g_hi - g_lo < 5:
+            g_hi = g_lo + 5
 
-    mag = _Panel(left, top, plot_w, mag_h, fmin, fmax, g_lo, g_hi, log_x=True)
-    phase_top = top + mag_h + gap
-    p_lo = min(-180.0, math.floor(min(phase_deg) / 45) * 45)
-    p_hi = max(0.0, math.ceil(max(phase_deg) / 45) * 45)
-    if p_hi - p_lo < 45:
-        p_hi = p_lo + 45
-    phase = _Panel(left, phase_top, plot_w, phase_h, fmin, fmax, p_lo, p_hi, log_x=True)
+        mag = _Panel(left, top, plot_w, mag_h, fmin, fmax, g_lo, g_hi, log_x=True)
+        phase_top = top + mag_h + gap
+        p_lo = min(-180.0, math.floor(min(phase_deg) / 45) * 45)
+        p_hi = max(0.0, math.ceil(max(phase_deg) / 45) * 45)
+        if p_hi - p_lo < 45:
+            p_hi = p_lo + 45
+        phase = _Panel(left, phase_top, plot_w, phase_h, fmin, fmax, p_lo, p_hi, log_x=True)
 
-    parts = [mag.frame(), phase.frame()]
-    parts.append(mag.y_grid(_nice_ticks(g_lo, g_hi, 4), "dB"))
-    parts.append(phase.y_grid(_nice_ticks(p_lo, p_hi, 4), "°"))
-    parts.append(mag.x_grid(_decade_ticks(fmin, fmax), lambda f: _eng(f, "Hz"), labels=False))
-    parts.append(phase.x_grid(_decade_ticks(fmin, fmax), lambda f: _eng(f, "Hz")))
+        ticks = _decade_ticks(fmin, fmax, stride)
+        parts = [mag.frame(), phase.frame()]
+        parts.append(mag.y_grid(_nice_ticks(g_lo, g_hi, 3 if compact else 4), "dB", font=font))
+        parts.append(phase.y_grid(_nice_ticks(p_lo, p_hi, 3 if compact else 4), "°", font=font))
+        parts.append(mag.x_grid(ticks, lambda f: _eng(f, "Hz"), labels=False, font=font))
+        parts.append(phase.x_grid(ticks, lambda f: _eng(f, "Hz"), font=font))
 
-    parts.append(mag.polyline(freqs, gain_db, TEAL, 2.4))
-    parts.append(phase.polyline(freqs, phase_deg, NAVY, 2.0))
+        parts.append(mag.polyline(freqs, gain_db, TEAL, 2.4))
+        parts.append(phase.polyline(freqs, phase_deg, NAVY, 2.0))
 
-    # -3 dB reference line and corners, when the sweep contains them.
-    if cutoff:
-        target = cutoff.get("target_db")
-        if target is not None and g_lo <= target <= g_hi:
-            yy = mag.py(target)
-            parts.append(
-                f'<line x1="{mag.x:.1f}" y1="{yy:.1f}" x2="{mag.x + mag.w:.1f}" '
-                f'y2="{yy:.1f}" stroke="{ORANGE}" stroke-width="1.4" '
-                f'stroke-dasharray="6 4"/>'
-            )
-            parts.append(
-                f'<text x="{mag.x + 6:.1f}" y="{yy - 6:.1f}" '
-                f'text-anchor="start" font-size="12" fill="{ORANGE}">'
-                f'−3 dB ({target:.1f} dB)</text>'
-            )
-        for key, label in (("f_low_hz", "fL"), ("f_high_hz", "fH")):
-            value = cutoff.get(key)
-            if value and fmin <= value <= fmax:
-                xx = mag.px(value)
+        # -3 dB reference line and corners, when the sweep contains them.
+        if cutoff:
+            target = cutoff.get("target_db")
+            if target is not None and g_lo <= target <= g_hi:
+                yy = mag.py(target)
                 parts.append(
-                    f'<line x1="{xx:.1f}" y1="{mag.y:.1f}" x2="{xx:.1f}" '
-                    f'y2="{mag.y + mag.h:.1f}" stroke="{ORANGE}" '
-                    f'stroke-width="1.2" stroke-dasharray="4 4"/>'
+                    f'<line x1="{mag.x:.1f}" y1="{yy:.1f}" x2="{mag.x + mag.w:.1f}" '
+                    f'y2="{yy:.1f}" stroke="{ORANGE}" stroke-width="1.4" '
+                    f'stroke-dasharray="6 4"/>'
                 )
-                anchor = "end" if xx > mag.x + mag.w * 0.55 else "start"
-                offset = -4 if anchor == "end" else 4
                 parts.append(
-                    f'<text x="{xx + offset:.1f}" y="{mag.y + 14:.1f}" '
-                    f'text-anchor="{anchor}" font-size="12" fill="{ORANGE}">'
-                    f'{label} {_eng(value, "Hz")}</text>'
+                    f'<text x="{mag.x + 6:.1f}" y="{yy - 6:.1f}" '
+                    f'text-anchor="start" font-size="{small}" fill="{ORANGE}">'
+                    f'−3 dB ({target:.1f} dB)</text>'
                 )
+            for key, label in (("f_low_hz", "fL"), ("f_high_hz", "fH")):
+                value = cutoff.get(key)
+                if value and fmin <= value <= fmax:
+                    xx = mag.px(value)
+                    parts.append(
+                        f'<line x1="{xx:.1f}" y1="{mag.y:.1f}" x2="{xx:.1f}" '
+                        f'y2="{mag.y + mag.h:.1f}" stroke="{ORANGE}" '
+                        f'stroke-width="1.2" stroke-dasharray="4 4"/>'
+                    )
+                    anchor = "end" if xx > mag.x + mag.w * 0.55 else "start"
+                    offset = -4 if anchor == "end" else 4
+                    parts.append(
+                        f'<text x="{xx + offset:.1f}" y="{mag.y + 14:.1f}" '
+                        f'text-anchor="{anchor}" font-size="{small}" fill="{ORANGE}">'
+                        f'{label} {_eng(value, "Hz")}</text>'
+                    )
 
-    # Axis titles
-    parts.append(
-        f'<text x="{left}" y="{top - 6}" font-size="13" font-weight="600" '
-        f'fill="{NAVY}">Gain magnitude</text>'
-    )
-    parts.append(
-        f'<text x="{left}" y="{phase_top - 6}" font-size="13" font-weight="600" '
-        f'fill="{NAVY}">Phase</text>'
-    )
-    parts.append(
-        f'<text x="{left + plot_w / 2:.1f}" y="{height - 6}" text-anchor="middle" '
-        f'font-size="13" fill="{MUTED}">Frequency (Hz, log scale)</text>'
-    )
+        parts.append(
+            f'<text x="{left}" y="{top - 6}" font-size="{font}" font-weight="600" '
+            f'fill="{NAVY}">Gain magnitude</text>'
+        )
+        parts.append(
+            f'<text x="{left}" y="{phase_top - 6}" font-size="{font}" font-weight="600" '
+            f'fill="{NAVY}">Phase</text>'
+        )
+        parts.append(
+            f'<text x="{left + plot_w / 2:.1f}" y="{h - 6}" text-anchor="middle" '
+            f'font-size="{font}" fill="{MUTED}">Frequency (Hz, log scale)</text>'
+        )
+        return "".join(parts)
 
-    inner = "".join(parts)
-    return _wrap(
+    narrow_h = round(height * 380 / width)
+    return _wrap_responsive(
         width,
         height,
-        inner,
+        render(width, height),
+        render(380, narrow_h, compact=True),
         "Bode plot from ngspice .ac run",
         "Gain magnitude in dB and phase in degrees against logarithmic frequency.",
     )
 
 
 def wave_svg(time_s, vin_v, vout_v, width=760, height=330) -> str:
-    """Input and output voltage versus time, from one .tran run."""
+    """Input and output voltage versus time, from one .tran run.
+
+    As with the Bode plot, two real renderings of the same arrays are emitted
+    and CSS chooses the one that fits the viewport.
+    """
     if not time_s:
         return ""
 
-    left, right, top, bottom = 66, 18, 26, 46
-    plot_w = width - left - right
-    plot_h = height - top - bottom
+    def render(w, h, compact=False):
+        if compact:
+            left, right, top, bottom = 46, 10, 18, 32
+            font, small = 16, 15
+            y_count, x_count = 3, 3
+        else:
+            left, right, top, bottom = 66, 18, 26, 46
+            font, small = 13, 12
+            y_count, x_count = 4, 5
+        plot_w = w - left - right
+        plot_h = h - top - bottom
 
-    tmax = max(time_s) or 1e-3
-    values = list(vin_v) + list(vout_v)
-    peak = max(abs(v) for v in values) if values else 1.0
-    peak = peak or 1.0
-    span = peak * 1.12
+        tmax = max(time_s) or 1e-3
+        values = list(vin_v) + list(vout_v)
+        peak = max(abs(v) for v in values) if values else 1.0
+        peak = peak or 1.0
+        span = peak * 1.12
 
-    panel = _Panel(left, top, plot_w, plot_h, 0.0, tmax, -span, span)
-    parts = [panel.frame()]
-    parts.append(panel.y_grid(_nice_ticks(-span, span, 4), "V"))
-    ticks = _nice_ticks(0.0, tmax, 5)
-    parts.append(panel.x_grid(ticks, lambda t: f"{t * 1e3:g}"))
-    parts.append(panel.polyline(time_s, vin_v, TEAL, 1.8))
-    parts.append(panel.polyline(time_s, vout_v, ORANGE, 2.0))
+        panel = _Panel(left, top, plot_w, plot_h, 0.0, tmax, -span, span)
+        parts = [panel.frame()]
+        parts.append(panel.y_grid(_nice_ticks(-span, span, y_count), "V", font=font))
+        ticks = _nice_ticks(0.0, tmax, x_count)
+        parts.append(panel.x_grid(ticks, lambda t: f"{t * 1e3:g}", font=font))
+        parts.append(panel.polyline(time_s, vin_v, TEAL, 1.8))
+        parts.append(panel.polyline(time_s, vout_v, ORANGE, 2.0))
 
-    parts.append(
-        f'<line x1="{left}" y1="{panel.py(0):.1f}" x2="{left + plot_w}" '
-        f'y2="{panel.py(0):.1f}" stroke="{AXIS}" stroke-width="1"/>'
-    )
-    parts.append(
-        f'<text x="{left + plot_w / 2:.1f}" y="{height - 8}" text-anchor="middle" '
-        f'font-size="13" fill="{MUTED}">Time (ms)</text>'
-    )
-    # Legend
-    legend_x = left + plot_w - 150
-    parts.append(
-        f'<rect x="{legend_x - 10}" y="{top + 6}" width="160" height="38" rx="5" '
-        f'fill="#ffffff" fill-opacity="0.88" stroke="{GRID}"/>'
-    )
-    parts.append(
-        f'<line x1="{legend_x}" y1="{top + 19}" x2="{legend_x + 22}" y2="{top + 19}" '
-        f'stroke="{TEAL}" stroke-width="2.4"/>'
-    )
-    parts.append(
-        f'<text x="{legend_x + 28}" y="{top + 23}" font-size="12" fill="{INK}">Vin</text>'
-    )
-    parts.append(
-        f'<line x1="{legend_x}" y1="{top + 35}" x2="{legend_x + 22}" y2="{top + 35}" '
-        f'stroke="{ORANGE}" stroke-width="2.4"/>'
-    )
-    parts.append(
-        f'<text x="{legend_x + 28}" y="{top + 39}" font-size="12" fill="{INK}">Vout</text>'
-    )
+        parts.append(
+            f'<line x1="{left}" y1="{panel.py(0):.1f}" x2="{left + plot_w}" '
+            f'y2="{panel.py(0):.1f}" stroke="{AXIS}" stroke-width="1"/>'
+        )
+        parts.append(
+            f'<text x="{left + plot_w / 2:.1f}" y="{h - 8}" text-anchor="middle" '
+            f'font-size="{font}" fill="{MUTED}">Time (ms)</text>'
+        )
+        # Legend
+        legend_x = left + plot_w - 150
+        parts.append(
+            f'<rect x="{legend_x - 10}" y="{top + 6}" width="160" height="38" rx="5" '
+            f'fill="#ffffff" fill-opacity="0.88" stroke="{GRID}"/>'
+        )
+        parts.append(
+            f'<line x1="{legend_x}" y1="{top + 19}" x2="{legend_x + 22}" y2="{top + 19}" '
+            f'stroke="{TEAL}" stroke-width="2.4"/>'
+        )
+        parts.append(
+            f'<text x="{legend_x + 28}" y="{top + 23}" font-size="{small}" fill="{INK}">Vin</text>'
+        )
+        parts.append(
+            f'<line x1="{legend_x}" y1="{top + 35}" x2="{legend_x + 22}" y2="{top + 35}" '
+            f'stroke="{ORANGE}" stroke-width="2.4"/>'
+        )
+        parts.append(
+            f'<text x="{legend_x + 28}" y="{top + 39}" font-size="{small}" fill="{INK}">Vout</text>'
+        )
+        return "".join(parts)
 
-    inner = "".join(parts)
-    return _wrap(
+    narrow_h = round(height * 380 / width)
+    return _wrap_responsive(
         width,
         height,
-        inner,
+        render(width, height),
+        render(380, narrow_h, compact=True),
         "Transient waveforms from ngspice .tran run",
         "Input and output voltage in volts against time in milliseconds.",
     )
