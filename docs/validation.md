@@ -269,3 +269,49 @@ VCE = 9.931780 − 1.899002 = 8.032779 V
 | `docs/evidence/lab03-A3.jpeg` | Emitter Bias RB = 1000 kΩ, RE = 1 kΩ |
 | `docs/evidence/lab03-A4.jpeg` | Emitter Bias RE = 2 kΩ — IC ลด, VCE ลด |
 | `docs/evidence/lab03-A5.jpeg` | Fixed Bias RB = 0 — error, ไม่มีผลค้าง |
+
+---
+
+# Lab 04 — Common-Emitter Amplifier Simulator (ngspice)
+
+## 12. ภาพรวม Lab 04
+
+- **โจทย์:** นำวงจร CE Voltage-Divider ของ Lab 03 เข้าสู่ระบบ simulate แบบ real ผ่าน ngspice
+- **Engine:** ngspice 47 (vendored MSYS2, `tools/ngspice/ucrt64/bin/ngspice_con.exe`)
+- **Model:** Q2N3904 (ON Semi 2N3904 Gummel-Poon) — แทน starter kit ที่ยังไม่พบ
+- **ผลลัพธ์:** `GET /simulator?analysis=dc|ac|tran` + `POST /simulate` → netlist → batch run → parse → SVG chart
+
+## 13. ผลตรวจสอบจริง (ngspice + OpenCode Browser)
+
+ทุกกรณีใช้ค่าอ้างอิงเดียวกัน: VCC = 12 V, RC = 2.2 kΩ, β = 100, VBE = 0.70 V
+
+### A. DC operating point (`.op`)
+
+ผลลัพธ์จริงจาก ngspice (`POST /simulate`, analysis=dc):
+
+| ค่าที่จัด | SPICE (ngspice) | แบบจำลอง Lab 3 (analytical) | Δ |
+|---|---|---|---|
+| VB | 2.004 V | 1.942 V | +3.2 % |
+| VE | 1.333 V | 1.242 V | +7.3 % |
+| VC | 9.087 V | 9.294 V | −2.2 % |
+| VCE | 7.754 V | 8.052 V | −3.7 % |
+| IC | 1.324 mA | 1.230 mA | +7.7 % |
+
+### B. AC sweep (`.ac`, dec 20, 0.1 Hz – 500 MHz)
+
+- Midband gain / fL / fH (−3 dB) / bandwidth → วาด Bode SVG จาก `wrdata`
+
+### C. Transient (`.tran`, 5 cycles)
+
+- Vin peak 0.010 V, Vout peak 0.018 V, Gain pp 1.76 V/V, phase inverted ≈180°, duration 5.00 ms, 2008 points
+
+## 14. ข้อจำกัด Lab 04
+
+- ความแตกต่าง Δ ระหว่าง SPICE (Q2N3904) กับ analytical Lab 3 (β/VBE คงที่) เป็น expected behaviour
+- การเปรียบเทียบเป็น sanity check ไม่ใช่ requirement
+- Regression test สำหรับ label −3 dB ของ `plots.py` ถูกเพิ่มใน `tests/test_plots.py`
+
+## 15. สรุป workflow งาน Lab 04
+
+- Implementation → regression tests → full suite (71 OK) → browser verification (AC/DC/Tran จริง) → docs → commit → push
+- Commit: `feat: add CE amplifier simulator with real ngspice runs (DC/AC/Transient)` (ผู้ใช้ commit ผ่าน GitHub Desktop)
