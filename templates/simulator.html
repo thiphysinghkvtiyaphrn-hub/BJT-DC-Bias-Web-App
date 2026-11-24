@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lab 04 · CE Amplifier Simulator · {{ analysis_label }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header class="masthead">
+    <div class="masthead-inner">
+      <div>
+        <p class="eyebrow">ENG29 2121 · Computer Programming for Electrical Engineers</p>
+        <h1>Lab 04 · BJT Amplifier Simulator v1</h1>
+        <p class="subtitle">Common-Emitter voltage divider — real ngspice DC / AC / Transient runs</p>
+      </div>
+      <nav class="site-nav" aria-label="Lab pages">
+        <a href="{{ url_for('index') }}">DC Bias (Lab 3)</a>
+        <a href="{{ url_for('simulator') }}" aria-current="page">CE Simulator (Lab 4)</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% if errors %}
+      <div class="banner banner-error" role="alert">
+        <strong>{{ banner_title }}</strong>
+        <ul>
+          {% for error in errors %}<li>{{ error }}</li>{% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    <div class="grid grid-sim">
+      <section class="panel panel-inputs">
+        <h2>Circuit &amp; Parameters</h2>
+        <form method="post" action="{{ url_for('simulate') }}">
+          <input type="hidden" name="analysis" value="{{ analysis }}">
+          <div class="mode-tabs" role="group" aria-label="Analysis mode">
+            {% for key, label in analyses.items() %}
+              <button type="submit" class="mode-tab{% if key == analysis %} is-active{% endif %}"
+                      name="run_analysis" value="{{ key }}"
+                      {% if key == analysis %}aria-current="true"{% endif %}>
+                {{ key|upper if key != 'tran' else 'Transient' }}
+              </button>
+            {% endfor %}
+          </div>
+
+          <table class="inputs">
+            <tbody>
+            {% for field, label, unit in fields %}
+              <tr>
+                <th scope="row"><label for="{{ field }}">{{ label }}</label></th>
+                <td><input id="{{ field }}" name="{{ field }}" type="text" inputmode="decimal"
+                           value="{{ form.get(field, '') }}" autocomplete="off"></td>
+                <td class="unit">{{ unit }}</td>
+              </tr>
+            {% endfor %}
+            </tbody>
+          </table>
+
+          <details class="details inline">
+            <summary>Analytical reference (Lab 3 model)</summary>
+            <table class="inputs">
+              <tbody>
+                <tr>
+                  <th scope="row"><label for="beta">β</label></th>
+                  <td><input id="beta" name="beta" type="text" inputmode="decimal"
+                             value="{{ form.get('beta', analytical_beta) }}" autocomplete="off"></td>
+                  <td class="unit"></td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="hint">Used only for the analytical comparison: β = {{ analytical_beta }},
+               VBE = {{ '%.2f'|format(analytical_vbe) }} V. ngspice uses the
+               {{ model_name }} model instead.</p>
+          </details>
+
+          <button type="submit">Run {{ analysis_label }}</button>
+        </form>
+
+        <p class="hint">
+          Resistances in kΩ, capacitors in µF, source in mV peak. The app converts
+          everything to SI units before writing the netlist.
+        </p>
+
+        <p class="engine-line">
+          <span class="badge {{ 'badge-ok' if engine.available else 'badge-bad' }}">
+            Engine: {{ engine.name }}{% if engine.version %} {{ engine.version }}{% endif %}
+          </span>
+          <span class="badge">Model: {{ model_name }}</span>
+          {% if not engine.available %}<span class="badge badge-bad">not found</span>{% endif %}
+        </p>
+      </section>
+
+      <section class="panel panel-chart">
+        <h2>Simulation &amp; Plots</h2>
+        {% if chart %}
+          {{ chart|safe }}
+          <p class="hint">
+            {{ analysis_label }} — run <code>{{ run.run_id }}</code>,
+            {{ run.elapsed_ms }} ms, data parsed from the ngspice output files.
+            {% if analysis == 'ac' %}
+              Sweep {{ ac_sweep_text }}. Gain is Vout/Vsource because the AC
+              source is set to 1 V for the sweep.
+            {% elif analysis == 'tran' %}
+              Input {{ form.get('freq', '1000') }} Hz sine; the run covers five cycles and the
+              plotted samples come straight from <code>wrdata</code>.
+            {% endif %}
+          </p>
+        {% elif run %}
+          <p class="hint">This analysis returns numbers only — no plot.</p>
+        {% else %}
+          <div class="placeholder">
+            <p><strong>No simulation has run yet.</strong></p>
+            <p>Choose DC, AC or Transient above and press
+               <em>Run {{ analysis_label }}</em>. The plots are drawn only from real
+               ngspice output — there are no stored or example waveforms in this app.</p>
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="panel panel-results">
+        <h2>Engineering Results</h2>
+        <p class="mode-label">{{ analysis_label }}</p>
+
+        <p class="run-status">
+          {% if run %}
+            <span class="badge badge-ok">Success</span>
+            <span class="badge">{{ run.started_utc }}</span>
+          {% elif errors %}
+            <span class="badge badge-bad">Error</span>
+          {% else %}
+            <span class="badge">Not run</span>
+          {% endif %}
+        </p>
+
+        <table class="results">
+          <tbody>
+          {% for label, value in rows %}
+            <tr>
+              <th scope="row">{{ label }}</th>
+              <td class="value">{{ value }}</td>
+            </tr>
+          {% else %}
+            <tr><td class="empty" colspan="2">Run an analysis to see measured values.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+
+        {% if comparison %}
+          <h3 class="subhead">Analytical vs SPICE (DC only)</h3>
+          <table class="compare">
+            <thead>
+              <tr><th scope="col">Qty</th><th scope="col">Lab 3</th><th scope="col">SPICE</th><th scope="col">Δ</th></tr>
+            </thead>
+            <tbody>
+              {% for row in comparison.rows %}
+                <tr>
+                  <th scope="row">{{ row.label }}</th>
+                  <td>{{ row.reference }}</td>
+                  <td>{{ row.simulated }}</td>
+                  <td>{{ row.delta }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+          <p class="hint">
+            Different models, different numbers: the Lab 3 path assumes constant
+            β = {{ comparison.beta }} and VBE = {{ '%.2f'|format(comparison.vbe) }} V,
+            while ngspice solves the {{ model_name }} device model. Agreement within a
+            few percent is a sanity check, not a requirement.
+          </p>
+        {% endif %}
+
+        <p class="hint">Every value above is parsed from the ngspice run log or data file.</p>
+      </section>
+    </div>
+
+    {% if run %}
+      <details class="details">
+        <summary>Provenance — netlist, run log, model</summary>
+        <dl class="provenance">
+          <dt>Engine</dt><dd>{{ engine.name }} {{ engine.version }} — <code>{{ engine.path }}</code></dd>
+          <dt>Model</dt><dd>{{ model_name }}: {{ model_source }}</dd>
+          <dt>Run</dt><dd><code>{{ run.run_id }}</code> · {{ run.analysis }} · {{ run.started_utc }} · {{ run.elapsed_ms }} ms</dd>
+        </dl>
+        <h3 class="subhead">Generated netlist</h3>
+        <pre class="code">{{ run.netlist }}</pre>
+        <h3 class="subhead">ngspice log (tail)</h3>
+        <pre class="code">{{ run.log }}</pre>
+      </details>
+    {% endif %}
+  </main>
+
+  <footer>ENG29 2121 · Lab 04 · Flask + Python backend + ngspice</footer>
+</body>
+</html>
