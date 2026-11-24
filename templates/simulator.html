@@ -28,6 +28,7 @@
         <ul>
           {% for error in errors %}<li>{{ error }}</li>{% endfor %}
         </ul>
+        <p class="banner-note">No results were produced. Correct the input and run the analysis again.</p>
       </div>
     {% endif %}
 
@@ -46,18 +47,28 @@
             {% endfor %}
           </div>
 
-          <table class="inputs">
-            <tbody>
-            {% for field, label, unit in fields %}
-              <tr>
-                <th scope="row"><label for="{{ field }}">{{ label }}</label></th>
-                <td><input id="{{ field }}" name="{{ field }}" type="text" inputmode="decimal"
-                           value="{{ form.get(field, '') }}" autocomplete="off"></td>
-                <td class="unit">{{ unit }}</td>
-              </tr>
-            {% endfor %}
-            </tbody>
-          </table>
+          {% set input_groups = [
+            ('Bias & load', ['vcc', 'r1', 'r2', 'rc', 're', 'rl']),
+            ('Coupling capacitors', ['cin', 'cout']),
+            ('Source signal', ['amp', 'freq'])
+          ] %}
+          {% for group_title, group_fields in input_groups %}
+            <fieldset class="input-group">
+              <legend>{{ group_title }}</legend>
+              <table class="inputs">
+                <tbody>
+                {% for field, label, unit in fields if field in group_fields %}
+                  <tr>
+                    <th scope="row"><label for="{{ field }}">{{ label }}</label></th>
+                    <td><input id="{{ field }}" name="{{ field }}" type="text" inputmode="decimal"
+                               value="{{ form.get(field, '') }}" autocomplete="off"></td>
+                    <td class="unit">{{ unit }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </fieldset>
+          {% endfor %}
 
           <details class="details inline">
             <summary>Analytical reference (Lab 3 model)</summary>
@@ -96,7 +107,7 @@
       <section class="panel panel-chart">
         <h2>Simulation &amp; Plots</h2>
         {% if chart %}
-          {{ chart|safe }}
+          <div class="chart-scroll">{{ chart|safe }}</div>
           <p class="hint">
             {{ analysis_label }} — run <code>{{ run.run_id }}</code>,
             {{ run.elapsed_ms }} ms, data parsed from the ngspice output files.
@@ -134,6 +145,16 @@
             <span class="badge">Not run</span>
           {% endif %}
         </p>
+
+        {% if run %}
+          <p class="run-provenance">
+            <span><strong>Run</strong> <code>{{ run.run_id }}</code></span>
+            <span><strong>Engine</strong> {{ engine.name }}{% if engine.version %} {{ engine.version }}{% endif %}</span>
+            <span><strong>Model</strong> {{ model_name }}</span>
+            <span><strong>Elapsed</strong> {{ run.elapsed_ms }} ms</span>
+            <span><strong>UTC</strong> {{ run.started_utc }}</span>
+          </p>
+        {% endif %}
 
         <table class="results">
           <tbody>
