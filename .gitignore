@@ -30,3 +30,6 @@ Thumbs.db
 # Flask
 instance/
 *.log
+
+# Vendored simulator binaries (ngspice) — keep local, do not commit
+tools/
