@@ -228,8 +228,187 @@ footer {
   .panel:first-child { grid-column: 1 / -1; }
 }
 
+/* Simulator layout: inputs on the left, the plot gets the wide column so its
+   axis labels stay legible, results underneath the plot. */
+.grid-sim {
+  grid-template-columns: 330px minmax(0, 1fr);
+}
+
+.grid-sim .panel-inputs { grid-column: 1; grid-row: 1 / span 2; }
+.grid-sim .panel-chart { grid-column: 2; grid-row: 1; }
+.grid-sim .panel-results { grid-column: 2; grid-row: 2; }
+
+@media (max-width: 1080px) {
+  .grid-sim { grid-template-columns: 1fr; }
+  .grid-sim .panel-inputs,
+  .grid-sim .panel-chart,
+  .grid-sim .panel-results { grid-column: auto; grid-row: auto; }
+}
+
 @media (max-width: 720px) {
   .grid { grid-template-columns: 1fr; }
   main { padding: 16px; }
   .panel:first-child { grid-column: auto; }
+}
+
+/* ---------------------------------------------------------------------------
+   Lab 04 · CE amplifier simulator
+   --------------------------------------------------------------------------- */
+
+.masthead-inner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.site-nav { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.site-nav a {
+  padding: 6px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2f2fb;
+  text-decoration: none;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 999px;
+}
+
+.site-nav a:hover { background: rgba(255, 255, 255, 0.14); }
+
+.site-nav a[aria-current="page"] {
+  background: #fff;
+  color: var(--navy);
+  border-color: #fff;
+}
+
+button.mode-tab {
+  flex: 1 1 auto;
+  width: auto;
+  margin: 0;
+  padding: 7px 10px;
+  font: 600 13px/1.3 inherit;
+  color: var(--blue);
+  background: #eef4fa;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button.mode-tab:hover { background: #e2edf7; }
+
+button.mode-tab.is-active {
+  color: #fff;
+  background: var(--blue);
+  border-color: var(--blue);
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 9px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--blue);
+  background: #eef4fa;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
+.badge-ok { color: #14603a; background: var(--ok-bg); border-color: #a8dcc0; }
+.badge-bad { color: #8c2c20; background: var(--bad-bg); border-color: #e2b3ad; }
+
+.engine-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 0;
+}
+
+.run-status { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 12px; }
+
+.chart { display: block; width: 100%; height: auto; }
+
+.placeholder {
+  padding: 22px 18px;
+  background: #f7fafd;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.placeholder p { margin: 0 0 8px; }
+.placeholder p:last-child { margin-bottom: 0; }
+
+.subhead {
+  margin: 20px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--blue);
+}
+
+.compare { font-size: 13px; }
+.compare th, .compare td {
+  padding: 6px 6px;
+  border-bottom: 1px solid #eef3f8;
+  text-align: right;
+}
+.compare thead th {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.compare tbody th { text-align: left; font-weight: 600; color: var(--ink); }
+.compare td { font-family: Consolas, Menlo, monospace; }
+
+.results td.empty {
+  padding: 14px 0;
+  color: var(--muted);
+  font-size: 14px;
+  text-align: left;
+}
+
+.details.inline { margin: 12px 0 0; padding: 10px 12px; background: #fbfdff; }
+.details.inline .inputs th { font-size: 13px; }
+.details.inline .hint { margin-top: 8px; }
+
+.provenance {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 6px 14px;
+  margin: 12px 0;
+  font-size: 13.5px;
+}
+
+.provenance dt { font-weight: 600; color: var(--blue); }
+.provenance dd { margin: 0; overflow-wrap: anywhere; }
+
+pre.code {
+  margin: 0 0 6px;
+  padding: 12px 14px;
+  font: 12.5px/1.55 Consolas, Menlo, monospace;
+  color: #23384a;
+  background: #f4f8fb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow-x: auto;
+  max-height: 340px;
+}
+
+code {
+  font-family: Consolas, Menlo, monospace;
+  font-size: 0.92em;
+  background: #eef3f8;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+@media (max-width: 720px) {
+  .provenance { grid-template-columns: 1fr; gap: 2px; }
+  .compare { font-size: 12px; }
 }
